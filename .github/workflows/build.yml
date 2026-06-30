@@ -63,17 +63,48 @@ jobs:
 
       - name: Patch kernel with APatch
         run: |
-          # Decompress Image.gz-dtb to get raw kernel
           cd out/arch/arm64/boot
           cp Image.gz-dtb Image.gz-dtb.bak
+          # Image.gz-dtb = Image.gz (compressed kernel) + appended DTBs
+          # Split: extract the gzip stream (compressed kernel) separately
+          python3 -c "
+          import gzip, io
+          with open('Image.gz-dtb', 'rb') as f:
+              data = f.read()
+          # Find end of gzip stream
+          import struct
+          pos = data.rfind(b'\x1f\x8b\x08')  # last gzip header
+          # Actually, gzip stream ends with 8-byte trailer
+          # Find the last gzip stream end marker
+          idx = len(data) - 1
+          while idx > 0 and data[idx] != 0x1f:
+              idx -= 1
+              if idx > 0 and data[idx] == 0x1f and data[idx+1] == 0x8b:
+                  break
+          # Simpler: just use the separate Image.gz which is already the compressed kernel
+          # The DTBs are appended after the gzip stream in Image.gz-dtb
+          # We can get DTB size = Image.gz-dtb size - Image.gz size
+          import os
+          gzip_size = os.path.getsize('Image.gz')
+          dtb_size = os.path.getsize('Image.gz-dtb') - gzip_size
+          print(f'Image.gz: {gzip_size} bytes')
+          print(f'DTB portion: {dtb_size} bytes')
+          with open('Image.gz-dtb', 'rb') as f:
+              f.seek(gzip_size)
+              dtb = f.read()
+          with open('dtb_part', 'wb') as f:
+              f.write(dtb)
+          print(f'Saved dtb_part: {len(dtb)} bytes')
+          "
+          # Decompress the kernel
           gunzip -c Image.gz > Image.raw
           # Patch with APatch (skey = super key)
           cd ../../../..
           ./kptools -p --image out/arch/arm64/boot/Image.raw --skey "123456789" --kpimg kpimg --out out/arch/arm64/boot/Image.patched
-          # Repackage: gzip compress, then append dtb
+          # Repackage: gzip compressed kernel + appended DTBs
           cd out/arch/arm64/boot
           gzip -c Image.patched > Image.gz.patched
-          cat Image.gz.patched kernel_dtb > Image.gz-dtb.patched
+          cat Image.gz.patched dtb_part > Image.gz-dtb.patched
           ls -lh Image.gz-dtb.patched Image.gz-dtb.bak
 
       - name: Package Droidspaces+APatch zip
