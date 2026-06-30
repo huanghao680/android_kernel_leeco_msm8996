@@ -48,18 +48,12 @@ jobs:
           make O=out lineage_x2_defconfig
           make O=out -j$(nproc)
 
-      - name: Package AnyKernel3 zip
+      - name: Package Droidspaces-only zip
         run: |
-          cp out/arch/arm64/boot/Image.gz-dtb anykernel3/
-          cd anykernel3
+          cp -r anykernel3 AnyKernel3-Droidspaces
+          cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3-Droidspaces/
+          cd AnyKernel3-Droidspaces
           zip -r9 ../Droidspaces-x2-kernel.zip * -x '*.git*' 'README.md' 'LICENSE'
-
-      - name: Upload kernel zip
-        uses: actions/upload-artifact@v4
-        with:
-          name: Droidspaces-x2-kernel
-          path: Droidspaces-x2-kernel.zip
-          retention-days: 30
 
       - name: Download APatch tools
         run: |
@@ -67,32 +61,35 @@ jobs:
           chmod +x kptools
           curl -skL "https://github.com/bmax121/KernelPatch/releases/latest/download/kpimg-android" -o kpimg
 
-      - name: Build APatch patched boot image
+      - name: Patch kernel with APatch
         run: |
-          # Extract stock boot from kernel build (kernel + empty ramdisk)
-          # Create a minimal boot.img for APatch patching
-          # Note: For full APatch, you need a stock boot.img
-          # This creates a kernel-only image for reference
-          echo "=== APatch Tools ==="
-          echo "kptools and kpimg downloaded."
-          echo ""
-          echo "To create a flashable APatch image:"
-          echo "1. Extract your stock boot.img from LineageOS ROM"
-          echo "2. Run: ./kptools unpack boot.img"
-          echo "3. Replace kernel with our Image.gz-dtb"
-          echo "4. Run: ./kptools -p --image kernel-b --skey '123456789' --kpimg kpimg --out kernel"
-          echo "5. Run: ./kptools repack boot.img"
-          echo "6. Flash new-boot.img via fastboot"
-          echo ""
-          echo "The APatch tools (kptools, kpimg) are available in the workflow artifacts."
+          # Decompress Image.gz-dtb to get raw kernel
+          cd out/arch/arm64/boot
+          cp Image.gz-dtb Image.gz-dtb.bak
+          gunzip -c Image.gz > Image.raw
+          # Patch with APatch (skey = super key)
+          cd ../../../..
+          ./kptools -p --image out/arch/arm64/boot/Image.raw --skey "123456789" --kpimg kpimg --out out/arch/arm64/boot/Image.patched
+          # Repackage: gzip compress, then append dtb
+          cd out/arch/arm64/boot
+          gzip -c Image.patched > Image.gz.patched
+          cat Image.gz.patched kernel_dtb > Image.gz-dtb.patched
+          ls -lh Image.gz-dtb.patched Image.gz-dtb.bak
 
-      - name: Upload APatch tools
+      - name: Package Droidspaces+APatch zip
+        run: |
+          cp -r anykernel3 AnyKernel3-Droidspaces-APatch
+          cp out/arch/arm64/boot/Image.gz-dtb.patched AnyKernel3-Droidspaces-APatch/Image.gz-dtb
+          cd AnyKernel3-Droidspaces-APatch
+          zip -r9 ../Droidspaces-APatch-x2-kernel.zip * -x '*.git*' 'README.md' 'LICENSE'
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: APatch-tools
+          name: kernel-zips
           path: |
-            kptools
-            kpimg
+            Droidspaces-x2-kernel.zip
+            Droidspaces-APatch-x2-kernel.zip
           retention-days: 30
 
       - name: Release
@@ -105,21 +102,24 @@ jobs:
             ## Droidspaces + APatch Kernel for LeMax2 (x2)
 
             ### 内核刷机包
-            - `Droidspaces-x2-kernel.zip` — AnyKernel3 格式，直接刷入
 
-            ### APatch 工具
-            - `kptools` + `kpimg` — 用于修补 boot.img
-            - 超级密码: `123456789`
-            - 需要配合原厂 boot.img 使用
+            | 文件 | 说明 |
+            |------|------|
+            | `Droidspaces-x2-kernel.zip` | 纯 Droidspaces 内核，AnyKernel3 格式 |
+            | `Droidspaces-APatch-x2-kernel.zip` | Droidspaces + APatch 内核，已内置超级密钥 |
+
+            ### APatch 信息
+            - 超级密钥 (SuperKey): `123456789`
+            - 已通过 kptools 直接修补内核镜像
 
             ### 编译信息
             - 内核版本: 3.18.140
-            - 内核配置: lineage_x2_defconfig + Droidspaces 补丁
+            - defconfig: lineage_x2_defconfig
+            - Droidspaces 配置: Namespaces + Cgroups + Network + OverlayFS
             - Droidspaces 补丁: xt_qtaguid panic fix + cgroup prefix fix
           files: |
             Droidspaces-x2-kernel.zip
-            kptools
-            kpimg
+            Droidspaces-APatch-x2-kernel.zip
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
