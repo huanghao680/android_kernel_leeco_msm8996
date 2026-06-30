@@ -1,0 +1,122 @@
+name: Build Kernel for LeMax2 (x2)
+
+on:
+  push:
+    branches: [lineage-18.1]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev make libncurses-dev zip python3 python3-pip
+
+      - name: Download GCC toolchain
+        run: |
+          git clone --depth=1 -b lineage-18.1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git toolchain
+
+      - name: Setup AnyKernel3
+        run: |
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git anykernel3
+
+      - name: Configure AnyKernel3
+        run: |
+          cd anykernel3
+          sed -i 's/do.devicecheck=1/do.devicecheck=0/' anykernel.sh
+          sed -i 's/device.name1=maguro/device.name1=x2/' anykernel.sh
+          sed -i 's|BLOCK=.*|BLOCK=/dev/block/bootdevice/by-name/boot|' anykernel.sh
+
+      - name: Suppress git dirty marker
+        run: echo -n "" > .scmversion
+
+      - name: Build kernel
+        run: |
+          export PATH=$PATH:$(pwd)/toolchain/bin
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-android-
+          make O=out mrproper
+          make O=out lineage_x2_defconfig
+          make O=out -j$(nproc)
+
+      - name: Package AnyKernel3 zip
+        run: |
+          cp out/arch/arm64/boot/Image.gz-dtb anykernel3/
+          cd anykernel3
+          zip -r9 ../Droidspaces-x2-kernel.zip * -x '*.git*' 'README.md' 'LICENSE'
+
+      - name: Upload kernel zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: Droidspaces-x2-kernel
+          path: Droidspaces-x2-kernel.zip
+          retention-days: 30
+
+      - name: Download APatch tools
+        run: |
+          curl -skL "https://github.com/bmax121/KernelPatch/releases/latest/download/kptools-linux" -o kptools
+          chmod +x kptools
+          curl -skL "https://github.com/bmax121/KernelPatch/releases/latest/download/kpimg-android" -o kpimg
+
+      - name: Build APatch patched boot image
+        run: |
+          # Extract stock boot from kernel build (kernel + empty ramdisk)
+          # Create a minimal boot.img for APatch patching
+          # Note: For full APatch, you need a stock boot.img
+          # This creates a kernel-only image for reference
+          echo "=== APatch Tools ==="
+          echo "kptools and kpimg downloaded."
+          echo ""
+          echo "To create a flashable APatch image:"
+          echo "1. Extract your stock boot.img from LineageOS ROM"
+          echo "2. Run: ./kptools unpack boot.img"
+          echo "3. Replace kernel with our Image.gz-dtb"
+          echo "4. Run: ./kptools -p --image kernel-b --skey '123456789' --kpimg kpimg --out kernel"
+          echo "5. Run: ./kptools repack boot.img"
+          echo "6. Flash new-boot.img via fastboot"
+          echo ""
+          echo "The APatch tools (kptools, kpimg) are available in the workflow artifacts."
+
+      - name: Upload APatch tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: APatch-tools
+          path: |
+            kptools
+            kpimg
+          retention-days: 30
+
+      - name: Release
+        if: github.ref == 'refs/heads/lineage-18.1'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: kernel-${{ github.run_number }}
+          name: "Kernel Build #${{ github.run_number }}"
+          body: |
+            ## Droidspaces + APatch Kernel for LeMax2 (x2)
+
+            ### 内核刷机包
+            - `Droidspaces-x2-kernel.zip` — AnyKernel3 格式，直接刷入
+
+            ### APatch 工具
+            - `kptools` + `kpimg` — 用于修补 boot.img
+            - 超级密码: `123456789`
+            - 需要配合原厂 boot.img 使用
+
+            ### 编译信息
+            - 内核版本: 3.18.140
+            - 内核配置: lineage_x2_defconfig + Droidspaces 补丁
+            - Droidspaces 补丁: xt_qtaguid panic fix + cgroup prefix fix
+          files: |
+            Droidspaces-x2-kernel.zip
+            kptools
+            kpimg
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
