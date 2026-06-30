@@ -1,5 +1,7 @@
 # Android Kernel for LeMax2 (x2) — Droidspaces Edition
 
+> 🤖 **本项目由 AI 全力驱动开发** — 从内核配置、补丁集成、编译调试到 Git 工作流，全程由 [Claude](https://claude.ai) 完成。
+
 基于 [LineageOS android_kernel_leeco_msm8996](https://github.com/LineageOS/android_kernel_leeco_msm8996) 的乐视 Max2 (x2) 内核源码，集成了 [Droidspaces](https://github.com/ravindu644/Droidspaces-OSS) 容器运行时所需的全部内核配置和补丁。
 
 ## 设备信息
