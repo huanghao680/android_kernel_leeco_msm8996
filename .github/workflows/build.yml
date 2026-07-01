@@ -173,6 +173,7 @@ jobs:
 
             | 文件 | 说明 |
             |------|------|
+            | `Droidspaces-x2-kernel.zip` | 纯 Droidspaces 内核，AnyKernel3 格式 |
             | `Droidspaces-ReSukiSU-x2.zip` | Droidspaces + ReSukiSU Root，AnyKernel3 格式 |
             | `Droidspaces-APatch-x2-kernel.zip` | Droidspaces + APatch 内核，已内置超级密钥 |
             | `boot-stock-lineage.img` | 原厂 LineageOS boot.img，备用 |
@@ -180,6 +181,7 @@ jobs:
             **APatch SuperKey**: `123456789`
             **ReSukiSU Manager**: 从 [GitHub Actions nightly](https://github.com/ReSukiSU/ReSukiSU/actions) 获取
           files: |
+            Droidspaces-x2-kernel.zip
             Droidspaces-ReSukiSU-x2.zip
             Droidspaces-APatch-x2-kernel.zip
             prebuilts/boot-stock-lineage.img
