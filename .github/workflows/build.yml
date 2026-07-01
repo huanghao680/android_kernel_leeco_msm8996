@@ -39,6 +39,12 @@ jobs:
       - name: Suppress git dirty marker
         run: echo -n "" > .scmversion
 
+      - name: Setup ReSukiSU
+        if: github.ref == 'refs/heads/integrate-resukisu'
+        run: |
+          git clone --depth=1 https://github.com/ReSukiSU/ReSukiSU.git KernelSU
+          ln -sf $(pwd)/KernelSU/kernel drivers/kernelsu
+
       - name: Build kernel
         run: |
           export PATH=$PATH:$(pwd)/toolchain/bin
