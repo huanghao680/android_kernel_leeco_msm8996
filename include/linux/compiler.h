@@ -58,6 +58,7 @@ extern void __chk_io_ptr(const volatile void __iomem *);
 #ifndef __has_attribute
 # define __has_attribute(x) __GCC4_has_attribute_##x
 # define __GCC4_has_attribute___copy__                0
+# define __GCC4_has_attribute___fallthrough__         0
 #endif
 
 #if __has_attribute(__copy__)
