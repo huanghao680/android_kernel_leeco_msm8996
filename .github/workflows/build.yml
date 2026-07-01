@@ -2,7 +2,7 @@ name: Build Kernel for LeMax2 (x2)
 
 on:
   push:
-    branches: [lineage-18.1]
+    branches: [lineage-18.1, integrate-resukisu]
   workflow_dispatch:
 
 permissions:
@@ -114,6 +114,14 @@ jobs:
           cd AnyKernel3-Droidspaces-APatch
           zip -r9 ../Droidspaces-APatch-x2-kernel.zip * -x '*.git*' 'README.md' 'LICENSE'
 
+      - name: Package ReSukiSU zip
+        if: github.ref == 'refs/heads/integrate-resukisu'
+        run: |
+          cp -r anykernel3 AnyKernel3-ReSukiSU
+          cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3-ReSukiSU/
+          cd AnyKernel3-ReSukiSU
+          zip -r9 ../Droidspaces-ReSukiSU-x2.zip * -x '*.git*' 'README.md' 'LICENSE'
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -121,18 +129,17 @@ jobs:
           path: |
             Droidspaces-x2-kernel.zip
             Droidspaces-APatch-x2-kernel.zip
+            Droidspaces-ReSukiSU-x2.zip
           retention-days: 30
 
-      - name: Release
+      - name: Release (lineage-18.1)
         if: github.ref == 'refs/heads/lineage-18.1'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: kernel-${{ github.run_number }}
-          name: "Kernel Build #${{ github.run_number }}"
+          tag_name: droidspaces-apatch-${{ github.run_number }}
+          name: "Droidspaces + APatch Build #${{ github.run_number }}"
           body: |
             ## Droidspaces + APatch Kernel for LeMax2 (x2)
-
-            ### 内核刷机包
 
             | 文件 | 说明 |
             |------|------|
@@ -140,17 +147,34 @@ jobs:
             | `Droidspaces-APatch-x2-kernel.zip` | Droidspaces + APatch 内核，已内置超级密钥 |
             | `boot-stock-lineage.img` | 原厂 LineageOS boot.img，备用 |
 
-            ### APatch 信息
-            - 超级密钥 (SuperKey): `123456789`
-            - 已通过 kptools 直接修补内核镜像
-
-            ### 编译信息
-            - 内核版本: 3.18.140
-            - defconfig: lineage_x2_defconfig
-            - Droidspaces 配置: Namespaces + Cgroups + Network + OverlayFS
-            - Droidspaces 补丁: xt_qtaguid panic fix + cgroup prefix fix
+            **APatch SuperKey**: `123456789`
           files: |
             Droidspaces-x2-kernel.zip
+            Droidspaces-APatch-x2-kernel.zip
+            prebuilts/boot-stock-lineage.img
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release (integrate-resukisu)
+        if: github.ref == 'refs/heads/integrate-resukisu'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: droidspaces-resukisu-${{ github.run_number }}
+          name: "Droidspaces + ReSukiSU Build #${{ github.run_number }}"
+          body: |
+            ## Droidspaces + ReSukiSU Kernel for LeMax2 (x2)
+
+            | 文件 | 说明 |
+            |------|------|
+            | `Droidspaces-ReSukiSU-x2.zip` | Droidspaces + ReSukiSU Root，AnyKernel3 格式 |
+            | `Droidspaces-APatch-x2-kernel.zip` | Droidspaces + APatch 内核，已内置超级密钥 |
+            | `boot-stock-lineage.img` | 原厂 LineageOS boot.img，备用 |
+
+            **APatch SuperKey**: `123456789`
+            **ReSukiSU Manager**: 从 [GitHub Actions nightly](https://github.com/ReSukiSU/ReSukiSU/actions) 获取
+          files: |
+            Droidspaces-ReSukiSU-x2.zip
             Droidspaces-APatch-x2-kernel.zip
             prebuilts/boot-stock-lineage.img
           draft: true
